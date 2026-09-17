@@ -43,7 +43,9 @@ export interface RepoHopToolErrorDetail {
 	[key: string]: unknown;
 }
 
-export function getToolErrorDetail(result: unknown): RepoHopToolErrorDetail | null {
+export function getToolErrorDetail(
+	result: unknown,
+): RepoHopToolErrorDetail | null {
 	if (typeof result !== "object" || result === null) return null;
 	const error = (result as { error?: unknown }).error;
 	if (typeof error !== "object" || error === null) return null;
@@ -55,11 +57,16 @@ export function getToolErrorDetail(result: unknown): RepoHopToolErrorDetail | nu
  * bearing: the operation may have completed locally. Never blindly retry it —
  * reconcile first (read back the state you tried to change).
  */
-export function codeForToolError(detail: RepoHopToolErrorDetail): RepoHopErrorCode {
+export function codeForToolError(
+	detail: RepoHopToolErrorDetail,
+): RepoHopErrorCode {
 	const code = String(detail.code ?? "").toUpperCase();
 	if (code.includes("AMBIGUOUS")) return "AMBIGUOUS_RESULT";
-	if (code.includes("FORBIDDEN") || code.includes("DENIED")) return "FORBIDDEN_SCOPE";
+	if (code.includes("FORBIDDEN") || code.includes("DENIED"))
+		return "FORBIDDEN_SCOPE";
 	if (code.includes("RATE") || code.includes("LIMIT")) return "RATE_LIMITED";
-	if (code.includes("TOO_LARGE") || code.includes("PAYLOAD")) return "REQUEST_TOO_LARGE";
+	if (code.includes("TOO_LARGE") || code.includes("PAYLOAD"))
+		return "REQUEST_TOO_LARGE";
+	if (code.includes("TIMEOUT")) return "TIMEOUT";
 	return "TOOL_REJECTED";
 }

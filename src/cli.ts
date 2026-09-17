@@ -47,23 +47,30 @@ async function main(): Promise<void> {
 	}
 	if (command === "logout") {
 		logout(config);
-		console.log("Local tokens forgotten. Revoke the grant in the dashboard to fully disconnect.");
+		console.log(
+			"Local tokens forgotten. Revoke the grant in the dashboard to fully disconnect.",
+		);
 		return;
 	}
 	const provider = new RepoHopOAuthProvider({
 		tokenPath: config.tokenPath,
 		callbackPort: config.callbackPort,
 		scopes: config.scopes,
+		redirectUri: config.redirectUri,
 	});
 	if (command === "status") {
 		console.log(`server: ${mcpUrl(config)}`);
-		console.log(`tokens: ${provider.hasTokens() ? "present" : "missing (run login)"}`);
+		console.log(
+			`tokens: ${provider.hasTokens() ? "present" : "missing (run login)"}`,
+		);
 		if (!provider.hasTokens()) return;
 		const connected = await connectRepoHop(config, { provider });
 		try {
 			const client = new RepoHopClient(connected.client, config);
 			const tools = await client.tools();
-			console.log(`tools granted (${tools.length}): ${tools.map((t) => t.name).join(", ")}`);
+			console.log(
+				`tools granted (${tools.length}): ${tools.map((t) => t.name).join(", ")}`,
+			);
 		} finally {
 			await connected.close();
 		}
@@ -85,7 +92,10 @@ async function main(): Promise<void> {
 		const connected = await connectRepoHop(config, { provider });
 		try {
 			const client = new RepoHopClient(connected.client, config);
-			const result = await client.call(tool, JSON.parse(json) as Record<string, unknown>);
+			const result = await client.call(
+				tool,
+				JSON.parse(json) as Record<string, unknown>,
+			);
 			console.log(JSON.stringify(result, null, 2));
 		} finally {
 			await connected.close();

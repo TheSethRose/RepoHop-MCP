@@ -12,5 +12,8 @@
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab"
+	},
+	"files": {
+		"includes": ["src/**", "test/**", "*.json", "*.md", "!dist"]
 	}
 }

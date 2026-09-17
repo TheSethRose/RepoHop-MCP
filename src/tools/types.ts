@@ -134,6 +134,19 @@ export interface SearchArgs extends ProjectArgs {
 	limit?: number;
 }
 
+export interface StatusArgs extends ProjectArgs {
+	fetch?: boolean;
+}
+
+export interface SnapshotArgs extends ProjectArgs, PageArgs {
+	includeDiff?: boolean;
+}
+
+export interface ListArgs extends ProjectArgs, PageArgs {
+	path?: string;
+	depth?: number;
+}
+
 export interface WriteArgs extends ProjectArgs {
 	path: string;
 	content: string;
@@ -208,6 +221,9 @@ export interface PushArgs extends ProjectArgs {
 export type ToolArgs =
 	| Record<string, never>
 	| ProjectArgs
+	| StatusArgs
+	| SnapshotArgs
+	| ListArgs
 	| ReadArgs
 	| ReadManyArgs
 	| SearchArgs

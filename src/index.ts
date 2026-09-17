@@ -1,9 +1,23 @@
-export { loadConfig, mcpUrl, REPOHOP_SCOPES, type RepoHopConfig } from "./config.js";
-export { RepoHopError, codeForToolError, getToolErrorDetail, type RepoHopErrorCode } from "./errors.js";
+export {
+	loadConfig,
+	mcpUrl,
+	REPOHOP_SCOPES,
+	type RepoHopConfig,
+} from "./config.js";
+export {
+	RepoHopError,
+	codeForToolError,
+	getToolErrorDetail,
+	type RepoHopErrorCode,
+} from "./errors.js";
 export { FileTokenStore } from "./auth/storage.js";
 export { RepoHopOAuthProvider } from "./auth/provider.js";
 export { login, logout } from "./auth/flow.js";
-export { connectRepoHop, toRepoHopTransportError, type ConnectedClient } from "./transport/client.js";
+export {
+	connectRepoHop,
+	toRepoHopTransportError,
+	type ConnectedClient,
+} from "./transport/client.js";
 export { RepoHopClient } from "./tools/client.js";
 export {
 	REPOHOP_TOOL_NAMES,
@@ -15,6 +29,9 @@ export {
 	type RepoHopToolName,
 	type CatalogProject,
 	type ToolRisk,
+	type StatusArgs,
+	type SnapshotArgs,
+	type ListArgs,
 } from "./tools/types.js";
 export {
 	allowAll,

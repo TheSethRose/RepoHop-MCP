@@ -36,6 +36,14 @@ describe("config", () => {
 		expect(config.baseUrl).toBe("http://localhost:3000");
 		expect(config.scopes).toEqual(["projects:read"]);
 	});
+	test("honors REPOHOP_REDIRECT_URI override", () => {
+		const config = loadConfig({
+			REPOHOP_REDIRECT_URI: "https://agent.meta.ai/api/hatch/oauth/callback",
+		});
+		expect(config.redirectUri).toBe(
+			"https://agent.meta.ai/api/hatch/oauth/callback",
+		);
+	});
 });
 
 describe("tool contract", () => {
@@ -46,7 +54,9 @@ describe("tool contract", () => {
 			expect(REPOHOP_TOOL_SCOPES[name].length).toBeGreaterThan(0);
 			expect(REPOHOP_TOOL_SCOPES[name][0]).toBe("projects:read");
 			expect(REPOHOP_REQUEST_BUDGETS[name]).toBeGreaterThan(0);
-			expect(["read", "write", "execute", "publish"]).toContain(REPOHOP_TOOL_RISK[name]);
+			expect(["read", "write", "execute", "publish"]).toContain(
+				REPOHOP_TOOL_RISK[name],
+			);
 		}
 	});
 	test("execute implies write (unsandboxed local authority)", () => {
@@ -69,12 +79,17 @@ describe("error taxonomy", () => {
 		expect(getToolErrorDetail({ result: { error: { code: "X" } } })).toBeNull();
 		const detail = getToolErrorDetail({ error: { code: "AMBIGUOUS_RESULT" } });
 		expect(detail?.code).toBe("AMBIGUOUS_RESULT");
-		expect(codeForToolError({ code: "AMBIGUOUS_RESULT" })).toBe("AMBIGUOUS_RESULT");
+		expect(codeForToolError({ code: "AMBIGUOUS_RESULT" })).toBe(
+			"AMBIGUOUS_RESULT",
+		);
 		expect(codeForToolError({ code: "FORBIDDEN" })).toBe("FORBIDDEN_SCOPE");
+		expect(codeForToolError({ code: "TIMEOUT" })).toBe("TIMEOUT");
 		expect(codeForToolError({ code: "whatever" })).toBe("TOOL_REJECTED");
 	});
 	test("RepoHopError carries code and retry hint", () => {
-		const error = new RepoHopError("RATE_LIMITED", "slow down", { retryAfterSec: 60 });
+		const error = new RepoHopError("RATE_LIMITED", "slow down", {
+			retryAfterSec: 60,
+		});
 		expect(error.code).toBe("RATE_LIMITED");
 		expect(error.retryAfterSec).toBe(60);
 	});
@@ -82,15 +97,41 @@ describe("error taxonomy", () => {
 
 describe("approval policy", () => {
 	test("read-only allows reads, denies the rest", async () => {
-		expect(await allowReadOnly({ tool: "project_read", args: {}, risk: "read" })).toBe(true);
-		expect(await allowReadOnly({ tool: "project_write", args: {}, risk: "write" })).toBe(false);
-		expect(await allowReadOnly({ tool: "project_exec", args: {}, risk: "execute" })).toBe(false);
-		expect(await allowAll({ tool: "project_push", args: {}, risk: "publish" })).toBe(true);
+		expect(
+			await allowReadOnly({ tool: "project_read", args: {}, risk: "read" }),
+		).toBe(true);
+		expect(
+			await allowReadOnly({ tool: "project_write", args: {}, risk: "write" }),
+		).toBe(false);
+		expect(
+			await allowReadOnly({ tool: "project_exec", args: {}, risk: "execute" }),
+		).toBe(false);
+		expect(
+			await allowAll({ tool: "project_push", args: {}, risk: "publish" }),
+		).toBe(true);
 	});
 	test("tiered approver escalates exec/publish", async () => {
 		const policy = tieredApprover(async () => false);
-		expect(await policy({ tool: "project_read", args: {}, risk: riskOf("project_read") })).toBe(true);
-		expect(await policy({ tool: "project_write", args: {}, risk: riskOf("project_write") })).toBe(true);
-		expect(await policy({ tool: "project_exec", args: {}, risk: riskOf("project_exec") })).toBe(false);
+		expect(
+			await policy({
+				tool: "project_read",
+				args: {},
+				risk: riskOf("project_read"),
+			}),
+		).toBe(true);
+		expect(
+			await policy({
+				tool: "project_write",
+				args: {},
+				risk: riskOf("project_write"),
+			}),
+		).toBe(true);
+		expect(
+			await policy({
+				tool: "project_exec",
+				args: {},
+				risk: riskOf("project_exec"),
+			}),
+		).toBe(false);
 	});
 });

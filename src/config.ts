@@ -19,6 +19,8 @@ export interface RepoHopConfig {
 	requestTimeoutMs: number;
 	/** Port for the loopback OAuth callback listener during login. */
 	callbackPort: number;
+	/** Optional OAuth redirect URI override (defaults to loopback). */
+	redirectUri?: string | undefined;
 }
 
 export const REPOHOP_SCOPES = [
@@ -30,13 +32,17 @@ export const REPOHOP_SCOPES = [
 ] as const;
 
 function defaultTokenPath(): string {
-	const home =
-		process.env.HOME ?? process.env.USERPROFILE ?? process.cwd();
+	const home = process.env.HOME ?? process.env.USERPROFILE ?? process.cwd();
 	return `${home}/.repohop-mcp/tokens.json`;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): RepoHopConfig {
-	const baseUrl = (env.REPOHOP_URL ?? "https://repohop.app").replace(/\/+$/, "");
+export function loadConfig(
+	env: NodeJS.ProcessEnv = process.env,
+): RepoHopConfig {
+	const baseUrl = (env.REPOHOP_URL ?? "https://repohop.app").replace(
+		/\/+$/,
+		"",
+	);
 	const scopes = (env.REPOHOP_SCOPES ?? [...REPOHOP_SCOPES].join(" "))
 		.split(/[\s,]+/)
 		.map((scope) => scope.trim())
@@ -48,6 +54,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RepoHopConfig 
 		tokenPath: env.REPOHOP_TOKEN_PATH ?? defaultTokenPath(),
 		requestTimeoutMs: Number(env.REPOHOP_REQUEST_TIMEOUT_MS ?? 120_000),
 		callbackPort: Number(env.REPOHOP_CALLBACK_PORT ?? 12719),
+		redirectUri: env.REPOHOP_REDIRECT_URI,
 	};
 }
 

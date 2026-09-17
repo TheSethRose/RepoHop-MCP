@@ -37,6 +37,7 @@ export async function connectRepoHop(
 			tokenPath: config.tokenPath,
 			callbackPort: config.callbackPort,
 			scopes: config.scopes,
+			redirectUri: config.redirectUri,
 		});
 	if (!provider.hasTokens()) {
 		throw new RepoHopError(
@@ -62,7 +63,10 @@ export async function connectRepoHop(
 		}
 		throw toRepoHopTransportError(error);
 	}
-	const serverInfo = client.getServerVersion() ?? { name: "unknown", version: "unknown" };
+	const serverInfo = client.getServerVersion() ?? {
+		name: "unknown",
+		version: "unknown",
+	};
 	return {
 		client,
 		transport,
@@ -86,13 +90,19 @@ export function toRepoHopTransportError(error: unknown): RepoHopError {
 		});
 	}
 	if (/413|too large/i.test(message)) {
-		return new RepoHopError("REQUEST_TOO_LARGE", `Request too large: ${message}`);
+		return new RepoHopError(
+			"REQUEST_TOO_LARGE",
+			`Request too large: ${message}`,
+		);
 	}
 	return new RepoHopError("TRANSPORT", `Transport failure: ${message}`);
 }
 
 export function readRetryAfter(error: unknown): number {
-	if (error instanceof RepoHopError && typeof error.retryAfterSec === "number") {
+	if (
+		error instanceof RepoHopError &&
+		typeof error.retryAfterSec === "number"
+	) {
 		return error.retryAfterSec;
 	}
 	return 60;

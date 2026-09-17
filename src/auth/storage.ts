@@ -51,11 +51,16 @@ export class FileTokenStore {
 		return issuer ?? FALLBACK_ISSUER;
 	}
 
-	getClientInformation(issuer?: string): StoredOAuthClientInformation | undefined {
+	getClientInformation(
+		issuer?: string,
+	): StoredOAuthClientInformation | undefined {
 		return this.read().clientInformation?.[this.key(issuer)];
 	}
 
-	saveClientInformation(info: StoredOAuthClientInformation, issuer?: string): void {
+	saveClientInformation(
+		info: StoredOAuthClientInformation,
+		issuer?: string,
+	): void {
 		const state = this.read();
 		state.clientInformation = {
 			...(state.clientInformation ?? {}),
@@ -84,7 +89,8 @@ export class FileTokenStore {
 
 	getCodeVerifier(): string {
 		const verifier = this.read().codeVerifier;
-		if (!verifier) throw new Error("No PKCE code verifier saved for this login attempt.");
+		if (!verifier)
+			throw new Error("No PKCE code verifier saved for this login attempt.");
 		return verifier;
 	}
 

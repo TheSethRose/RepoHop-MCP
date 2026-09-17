@@ -14,6 +14,9 @@ import {
 	REPOHOP_TOOL_SCOPES,
 	type CatalogProject,
 	type CommitArgs,
+	type StatusArgs,
+	type SnapshotArgs,
+	type ListArgs,
 	type DeleteArgs,
 	type DiffArgs,
 	type ExecArgs,
@@ -53,7 +56,10 @@ export class RepoHopClient {
 	async tools(): Promise<GrantedTool[]> {
 		const { tools } = await this.client.listTools();
 		this.granted = new Set(tools.map((tool) => tool.name));
-		return tools.map((tool) => ({ name: tool.name, description: tool.description }));
+		return tools.map((tool) => ({
+			name: tool.name,
+			description: tool.description,
+		}));
 	}
 
 	requireTool(name: RepoHopToolName): void {
@@ -69,7 +75,7 @@ export class RepoHopClient {
 	/** Byte size guard: fail fast before the gateway 413s the request. */
 	assertBudget(name: RepoHopToolName, args: unknown): void {
 		const bytes = Buffer.byteLength(JSON.stringify(args), "utf8");
-	 const protocolBudget = REPOHOP_REQUEST_BUDGETS[name];
+		const protocolBudget = REPOHOP_REQUEST_BUDGETS[name];
 		if (bytes > protocolBudget) {
 			throw new RepoHopError(
 				"REQUEST_TOO_LARGE",
@@ -93,7 +99,10 @@ export class RepoHopClient {
 	 * AMBIGUOUS_RESULT — the operation may have completed locally. Reconcile
 	 * (read back state) before retrying; never blindly resend.
 	 */
-	async call<T = unknown>(name: RepoHopToolName, args: Record<string, unknown>): Promise<T> {
+	async call<T = unknown>(
+		name: RepoHopToolName,
+		args: Record<string, unknown>,
+	): Promise<T> {
 		this.requireTool(name);
 		this.assertBudget(name, args);
 		let result: Awaited<ReturnType<Client["callTool"]>>;
@@ -105,9 +114,33 @@ export class RepoHopClient {
 		} catch (error) {
 			throw this.mapTransportError(name, error);
 		}
-		const structured = (result.structuredContent ?? null) as { result?: unknown } | null;
-	 const payload = structured !== null && "result" in structured ? structured.result : null;
-		if (result.isError || payload === null) {
+		const structured = (result.structuredContent ?? null) as {
+			result?: unknown;
+		} | null;
+		let hasResult = false;
+		let payload: unknown = null;
+		if (
+			structured !== null &&
+			typeof structured === "object" &&
+			"result" in structured
+		) {
+			payload = structured.result;
+			hasResult = true;
+		} else if (Array.isArray(result.content)) {
+			const textItem = result.content.find(
+				(c): c is { type: "text"; text: string } => c.type === "text",
+			);
+			if (textItem && typeof textItem.text === "string") {
+				try {
+					const parsed = JSON.parse(textItem.text);
+					if (parsed && typeof parsed === "object" && "result" in parsed) {
+						payload = parsed.result;
+						hasResult = true;
+					}
+				} catch {}
+			}
+		}
+		if (result.isError || !hasResult) {
 			const detail = getToolErrorDetail(payload ?? undefined) ?? {
 				message: textContent(result),
 			};
@@ -120,14 +153,21 @@ export class RepoHopClient {
 		return payload as T;
 	}
 
-	private mapTransportError(name: RepoHopToolName, error: unknown): RepoHopError {
+	private mapTransportError(
+		name: RepoHopToolName,
+		error: unknown,
+	): RepoHopError {
 		if (error instanceof RepoHopError) return error;
 		const message = error instanceof Error ? error.message : String(error);
-	 const mutating = REPOHOP_TOOL_RISK[name] !== "read";
+		const mutating = REPOHOP_TOOL_RISK[name] !== "read";
 		if (/429|rate|too many/i.test(message)) {
-			return new RepoHopError("RATE_LIMITED", `${name} rate limited: ${message}`, {
-				retryAfterSec: readRetryAfter(error),
-			});
+			return new RepoHopError(
+				"RATE_LIMITED",
+				`${name} rate limited: ${message}`,
+				{
+					retryAfterSec: readRetryAfter(error),
+				},
+			);
 		}
 		if (/abort|timeout|timed out/i.test(message)) {
 			if (mutating) {
@@ -138,11 +178,17 @@ export class RepoHopClient {
 			}
 			return new RepoHopError("TIMEOUT", `${name} timed out: ${message}`);
 		}
-		return new RepoHopError("TRANSPORT", `${name} transport failure: ${message}`);
+		return new RepoHopError(
+			"TRANSPORT",
+			`${name} transport failure: ${message}`,
+		);
 	}
 
 	/** Call with one automatic retry honoring Retry-After. Reads only. */
-	async callWithRetry<T>(name: RepoHopToolName, args: Record<string, unknown>): Promise<T> {
+	async callWithRetry<T>(
+		name: RepoHopToolName,
+		args: Record<string, unknown>,
+	): Promise<T> {
 		try {
 			return await this.call<T>(name, args);
 		} catch (error) {
@@ -167,7 +213,8 @@ export class RepoHopClient {
 		const projects = await this.catalog();
 		const match = projects.find((project) => project.alias === alias);
 		if (!match) {
-			const known = projects.map((project) => project.alias).join(", ") || "(none)";
+			const known =
+				projects.map((project) => project.alias).join(", ") || "(none)";
 			throw new RepoHopError(
 				"TOOL_REJECTED",
 				`Unknown project alias "${alias}". Granted: ${known}. Never substitute another project.`,
@@ -184,83 +231,140 @@ export class RepoHopClient {
 
 	async read(args: ReadArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.callWithRetry("project_read", args as unknown as Record<string, unknown>);
+		return this.callWithRetry(
+			"project_read",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
 	async readMany(args: ReadManyArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.callWithRetry("project_read_many", args as unknown as Record<string, unknown>);
+		return this.callWithRetry(
+			"project_read_many",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
 	async search(args: SearchArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.callWithRetry("project_search", args as unknown as Record<string, unknown>);
+		return this.callWithRetry(
+			"project_search",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
 	async diff(args: DiffArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.callWithRetry("project_diff", args as unknown as Record<string, unknown>);
+		return this.callWithRetry(
+			"project_diff",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
-	async status(project: string, fetch = false): Promise<unknown> {
-		await this.resolveProject(project);
-		return this.callWithRetry("project_status", { project, fetch });
+	async status(args: StatusArgs | string, fetch = false): Promise<unknown> {
+		const payload: StatusArgs =
+			typeof args === "string" ? { project: args, fetch } : args;
+		await this.resolveProject(payload.project);
+		return this.callWithRetry(
+			"project_status",
+			payload as unknown as Record<string, unknown>,
+		);
 	}
 
-	async snapshot(project: string, includeDiff = false): Promise<unknown> {
-		await this.resolveProject(project);
-		return this.callWithRetry("project_snapshot", { project, includeDiff });
+	async snapshot(
+		args: SnapshotArgs | string,
+		includeDiff = false,
+	): Promise<unknown> {
+		const payload: SnapshotArgs =
+			typeof args === "string" ? { project: args, includeDiff } : args;
+		await this.resolveProject(payload.project);
+		return this.callWithRetry(
+			"project_snapshot",
+			payload as unknown as Record<string, unknown>,
+		);
 	}
 
-	async list(project: string, path = "."): Promise<unknown> {
-		await this.resolveProject(project);
-		return this.callWithRetry("project_list", { project, path });
+	async list(args: ListArgs | string, path = "."): Promise<unknown> {
+		const payload: ListArgs =
+			typeof args === "string" ? { project: args, path } : args;
+		await this.resolveProject(payload.project);
+		return this.callWithRetry(
+			"project_list",
+			payload as unknown as Record<string, unknown>,
+		);
 	}
 
 	async write(args: WriteArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.call("project_write", args as unknown as Record<string, unknown>);
+		return this.call(
+			"project_write",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
 	async patch(args: PatchArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.call("project_patch", args as unknown as Record<string, unknown>);
+		return this.call(
+			"project_patch",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
 	async patchMany(args: PatchManyArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.call("project_patch_many", args as unknown as Record<string, unknown>);
+		return this.call(
+			"project_patch_many",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
 	async delete(args: DeleteArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.call("project_delete", args as unknown as Record<string, unknown>);
+		return this.call(
+			"project_delete",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
 	async exec(args: ExecArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.call("project_exec", args as unknown as Record<string, unknown>);
+		return this.call(
+			"project_exec",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
 	async process(args: ProcessArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.call("project_process", args as unknown as Record<string, unknown>);
+		return this.call(
+			"project_process",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
 	async commit(args: CommitArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.call("project_commit", args as unknown as Record<string, unknown>);
+		return this.call(
+			"project_commit",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 
 	async push(args: PushArgs): Promise<unknown> {
 		await this.resolveProject(args.project);
-		return this.call("project_push", args as unknown as Record<string, unknown>);
+		return this.call(
+			"project_push",
+			args as unknown as Record<string, unknown>,
+		);
 	}
 }
 
-function textContent(result: { content?: Array<{ type?: string; text?: string }> }): string {
+function textContent(result: {
+	content?: Array<{ type?: string; text?: string }>;
+}): string {
 	const first = result.content?.[0];
-	if (first?.type === "text" && typeof first.text === "string") return first.text;
+	if (first?.type === "text" && typeof first.text === "string")
+		return first.text;
 	return "unknown tool failure";
 }
 

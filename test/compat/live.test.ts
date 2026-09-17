@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import {
+	Client,
+	StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
 import { loadConfig, mcpUrl } from "../../src/config.js";
 import { RepoHopClient } from "../../src/tools/client.js";
-import { REPOHOP_TOOL_NAMES, type CatalogProject } from "../../src/tools/types.js";
+import {
+	REPOHOP_TOOL_NAMES,
+	type CatalogProject,
+} from "../../src/tools/types.js";
 
 /**
  * Live conformance against a real RepoHop server. Requires:
@@ -26,7 +32,10 @@ describe("live conformance", () => {
 	live("initializes and advertises project_* tools only", async () => {
 		const config = loadConfig({ REPOHOP_URL: baseUrl as string });
 		const transport = bearerTransport(mcpUrl(config), token as string);
-		const sdk = new Client({ name: "repohop-compat", version: "0.1.0" }, { capabilities: {} });
+		const sdk = new Client(
+			{ name: "repohop-compat", version: "0.1.0" },
+			{ capabilities: {} },
+		);
 		await sdk.connect(transport);
 		try {
 			const client = new RepoHopClient(sdk, config);
@@ -34,7 +43,9 @@ describe("live conformance", () => {
 			expect(tools.length).toBeGreaterThan(0);
 			for (const tool of tools) {
 				expect(tool.name.startsWith("project_")).toBe(true);
-				expect((REPOHOP_TOOL_NAMES as readonly string[]).includes(tool.name)).toBe(true);
+				expect(
+					(REPOHOP_TOOL_NAMES as readonly string[]).includes(tool.name),
+				).toBe(true);
 			}
 		} finally {
 			await sdk.close();
@@ -44,7 +55,10 @@ describe("live conformance", () => {
 	live("catalog resolves and a ready project reads", async () => {
 		const config = loadConfig({ REPOHOP_URL: baseUrl as string });
 		const transport = bearerTransport(mcpUrl(config), token as string);
-		const sdk = new Client({ name: "repohop-compat", version: "0.1.0" }, { capabilities: {} });
+		const sdk = new Client(
+			{ name: "repohop-compat", version: "0.1.0" },
+			{ capabilities: {} },
+		);
 		await sdk.connect(transport);
 		try {
 			const client = new RepoHopClient(sdk, config);

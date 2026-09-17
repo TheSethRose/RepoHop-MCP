@@ -9,7 +9,10 @@ import { loadConfig } from "../../src/config.js";
 import { RepoHopError } from "../../src/errors.js";
 
 function tempPath(): string {
-	return path.join(fs.mkdtempSync(path.join(os.tmpdir(), "repohop-mcp-")), "tokens.json");
+	return path.join(
+		fs.mkdtempSync(path.join(os.tmpdir(), "repohop-mcp-")),
+		"tokens.json",
+	);
 }
 
 describe("token store", () => {
@@ -17,7 +20,10 @@ describe("token store", () => {
 		const file = tempPath();
 		const store = new FileTokenStore(file);
 		store.saveClientInformation({ client_id: "abc" }, "https://x");
-		store.saveTokens({ access_token: "tok", token_type: "Bearer", refresh_token: "ref" }, "https://x");
+		store.saveTokens(
+			{ access_token: "tok", token_type: "Bearer", refresh_token: "ref" },
+			"https://x",
+		);
 		store.saveCodeVerifier("verifier");
 		expect(store.getClientInformation("https://x")?.client_id).toBe("abc");
 		expect(store.getTokens("https://x")?.refresh_token).toBe("ref");
@@ -37,8 +43,24 @@ describe("oauth provider", () => {
 		});
 		expect(provider.redirectUrl).toBe("http://127.0.0.1:12719/callback");
 		expect(provider.clientMetadata.token_endpoint_auth_method).toBe("none");
-		expect(provider.clientMetadata.redirect_uris).toEqual([provider.redirectUrl]);
+		expect(provider.clientMetadata.redirect_uris).toEqual([
+			provider.redirectUrl,
+		]);
 		expect(provider.hasTokens()).toBe(false);
+	});
+	test("honors custom redirect URI in metadata", () => {
+		const provider = new RepoHopOAuthProvider({
+			tokenPath: tempPath(),
+			callbackPort: 12719,
+			scopes: ["projects:read"],
+			redirectUri: "https://agent.meta.ai/api/hatch/oauth/callback",
+		});
+		expect(provider.redirectUrl).toBe(
+			"https://agent.meta.ai/api/hatch/oauth/callback",
+		);
+		expect(provider.clientMetadata.redirect_uris).toEqual([
+			"https://agent.meta.ai/api/hatch/oauth/callback",
+		]);
 	});
 });
 
@@ -98,6 +120,8 @@ describe("client guards", () => {
 		});
 		const client = new RepoHopClient(stub as never, loadConfig({}));
 		await client.tools();
-		await expect(client.read({ project: "other", path: "x" })).rejects.toThrow(/Unknown project alias/);
+		await expect(client.read({ project: "other", path: "x" })).rejects.toThrow(
+			/Unknown project alias/,
+		);
 	});
 });

@@ -34,7 +34,10 @@ export async function withBot<T>(
 	const connected = await connectRepoHop(config);
 	const client = new RepoHopClient(connected.client, config);
 	const close = () => connected.close();
-	const call = async <R>(tool: RepoHopToolName, args: Record<string, unknown>): Promise<R> => {
+	const call = async <R>(
+		tool: RepoHopToolName,
+		args: Record<string, unknown>,
+	): Promise<R> => {
 		const allowed = await approve({ tool, args, risk: riskOf(tool) });
 		if (!allowed) {
 			throw new RepoHopError("TOOL_REJECTED", `Operator declined ${tool}.`);

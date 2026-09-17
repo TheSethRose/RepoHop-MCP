@@ -10,7 +10,10 @@ export interface LoginResult {
 	authorized: boolean;
 }
 
-function listenForCode(port: number, timeoutMs: number): Promise<{ code: string; iss?: string | undefined }> {
+function listenForCode(
+	port: number,
+	timeoutMs: number,
+): Promise<{ code: string; iss?: string | undefined }> {
 	return new Promise((resolve, reject) => {
 		const server = http.createServer((req, res) => {
 			try {
@@ -21,9 +24,9 @@ function listenForCode(port: number, timeoutMs: number): Promise<{ code: string;
 				}
 				const error = url.searchParams.get("error");
 				if (error) {
-					res.writeHead(400, { "content-type": "text/plain" }).end(
-						"Authorization failed. You can close this tab.",
-					);
+					res
+						.writeHead(400, { "content-type": "text/plain" })
+						.end("Authorization failed. You can close this tab.");
 					server.close();
 					reject(new Error(`Authorization server error: ${error}`));
 					return;
@@ -31,12 +34,16 @@ function listenForCode(port: number, timeoutMs: number): Promise<{ code: string;
 				const code = url.searchParams.get("code");
 				const iss = url.searchParams.get("iss") ?? undefined;
 				if (!code) {
-					res.writeHead(400, { "content-type": "text/plain" }).end("Missing code.");
+					res
+						.writeHead(400, { "content-type": "text/plain" })
+						.end("Missing code.");
 					return;
 				}
-				res.writeHead(200, { "content-type": "text/plain" }).end(
-					"RepoHop connected. You can close this tab and return to your terminal.",
-				);
+				res
+					.writeHead(200, { "content-type": "text/plain" })
+					.end(
+						"RepoHop connected. You can close this tab and return to your terminal.",
+					);
 				server.close();
 				resolve({ code, iss });
 			} catch (error) {
@@ -47,7 +54,9 @@ function listenForCode(port: number, timeoutMs: number): Promise<{ code: string;
 		server.on("error", reject);
 		const timer = setTimeout(() => {
 			server.close();
-			reject(new Error("Timed out waiting for the browser authorization callback."));
+			reject(
+				new Error("Timed out waiting for the browser authorization callback."),
+			);
 		}, timeoutMs);
 		timer.unref?.();
 		server.listen(port, "127.0.0.1");
@@ -62,12 +71,16 @@ function listenForCode(port: number, timeoutMs: number): Promise<{ code: string;
  */
 export async function login(
 	config: RepoHopConfig,
-	options: { timeoutMs?: number; onAuthorizationUrl?: (url: string) => void } = {},
+	options: {
+		timeoutMs?: number;
+		onAuthorizationUrl?: (url: string) => void;
+	} = {},
 ): Promise<LoginResult> {
 	const provider = new RepoHopOAuthProvider({
 		tokenPath: config.tokenPath,
 		callbackPort: config.callbackPort,
 		scopes: config.scopes,
+		redirectUri: config.redirectUri,
 	});
 	const serverUrl = mcpUrl(config);
 	const first = await auth(provider, {

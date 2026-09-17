@@ -23,10 +23,13 @@ export class RepoHopOAuthProvider implements OAuthClientProvider {
 		tokenPath: string;
 		callbackPort: number;
 		scopes: string[];
-		clientName?: string;
+		clientName?: string | undefined;
+		redirectUri?: string | undefined;
 	}) {
 		this.store = new FileTokenStore(options.tokenPath);
-		this.redirectUrl = `http://127.0.0.1:${options.callbackPort}/callback`;
+		this.redirectUrl =
+			options.redirectUri ??
+			`http://127.0.0.1:${options.callbackPort}/callback`;
 		this.scopes = options.scopes;
 		this.clientName = options.clientName ?? "RepoHop MCP Client";
 	}
@@ -42,9 +45,9 @@ export class RepoHopOAuthProvider implements OAuthClientProvider {
 		};
 	}
 
-	clientInformation(
-		ctx?: { issuer?: string },
-	): StoredOAuthClientInformation | undefined {
+	clientInformation(ctx?: {
+		issuer?: string;
+	}): StoredOAuthClientInformation | undefined {
 		return this.store.getClientInformation(ctx?.issuer);
 	}
 
