@@ -42,7 +42,7 @@ export function promptApprover(): Approver {
 	};
 }
 
-/** Approve reads + writes, escalate exec/publish to a second approver. */
+/** Approve reads + writes, escalate exec/publish/manage to a second approver. */
 export function tieredApprover(escalate: Approver): Approver {
 	return async (request) => {
 		if (request.risk === "read" || request.risk === "write") return true;

@@ -45,6 +45,14 @@ await withBot(loadConfig(), async ({ call }) => {
 
 Writes need approval by default. For autonomous operation pass an explicit approver — see `src/approvals/policy.ts` (`allowReadOnly` default, `promptApprover`, `tieredApprover`, `allowAll` for fully trusted setups only).
 
+## Account-management tools (`manage_*`)
+
+Besides the 16 `project_*` repository tools, the server exposes 7 account tools: `manage_devices_list`, `manage_devices_remove`, `manage_repositories_list`, `manage_repositories_request`, `manage_connections_list`, `manage_connections_revoke`, `manage_settings_read`. They act on the cloud account (devices, repository registrations, grants, display settings) — never on checkout files.
+
+- They appear in `tools/list` only on grants carrying the matching `manage:*` scopes. The default grant (`REPOHOP_SCOPES`) is projects-only; to use them, re-login with e.g. `REPOHOP_SCOPES="projects:read offline_access manage:devices:read manage:repos:read manage:connections:read manage:settings:read"` plus the matching `:write` scopes for mutations.
+- Reads are `read` risk; `manage_devices_remove`, `manage_connections_revoke`, and `manage_repositories_request` are `manage` risk — denied by `allowReadOnly`, escalated to a human by `tieredApprover`.
+- `manage_devices_remove` and `manage_connections_revoke` additionally require a server elicitation confirmation round. Pass `onElicit` to `connectRepoHop` (return `true` to confirm) or those two calls cannot complete; every other management tool is unaffected.
+
 ## Rules your bot must follow
 
 - **Catalog first, alias-exact.** Unknown alias = stop and ask. The client enforces this.

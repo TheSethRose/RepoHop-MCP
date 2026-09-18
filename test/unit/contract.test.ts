@@ -47,16 +47,24 @@ describe("config", () => {
 });
 
 describe("tool contract", () => {
-	test("exactly the 16 project_* tools, each with scopes, risk, budget", () => {
-		expect(REPOHOP_TOOL_NAMES).toHaveLength(16);
+	test("exactly the 23 project_* + manage_* tools, each with scopes, risk, budget", () => {
+		expect(REPOHOP_TOOL_NAMES).toHaveLength(23);
 		for (const name of REPOHOP_TOOL_NAMES) {
-			expect(name.startsWith("project_")).toBe(true);
+			expect(name.startsWith("project_") || name.startsWith("manage_")).toBe(
+				true,
+			);
 			expect(REPOHOP_TOOL_SCOPES[name].length).toBeGreaterThan(0);
-			expect(REPOHOP_TOOL_SCOPES[name][0]).toBe("projects:read");
 			expect(REPOHOP_REQUEST_BUDGETS[name]).toBeGreaterThan(0);
-			expect(["read", "write", "execute", "publish"]).toContain(
+			expect(["read", "write", "execute", "publish", "manage"]).toContain(
 				REPOHOP_TOOL_RISK[name],
 			);
+		}
+		for (const name of REPOHOP_TOOL_NAMES) {
+			if (name.startsWith("project_")) {
+				expect(REPOHOP_TOOL_SCOPES[name][0]).toBe("projects:read");
+			} else {
+				expect(REPOHOP_TOOL_SCOPES[name][0]?.startsWith("manage:")).toBe(true);
+			}
 		}
 	});
 	test("execute implies write (unsandboxed local authority)", () => {
@@ -64,6 +72,44 @@ describe("tool contract", () => {
 			expect(REPOHOP_TOOL_SCOPES[name]).toContain("projects:write");
 			expect(REPOHOP_TOOL_SCOPES[name]).toContain("projects:exec");
 			expect(REPOHOP_TOOL_RISK[name]).toBe("execute");
+		}
+	});
+	test("management tools carry manage scopes and escalating risk", () => {
+		expect(REPOHOP_TOOL_SCOPES.manage_devices_list).toEqual([
+			"manage:devices:read",
+		]);
+		expect(REPOHOP_TOOL_SCOPES.manage_devices_remove).toEqual([
+			"manage:devices:write",
+		]);
+		expect(REPOHOP_TOOL_SCOPES.manage_repositories_list).toEqual([
+			"manage:repos:read",
+		]);
+		expect(REPOHOP_TOOL_SCOPES.manage_repositories_request).toEqual([
+			"manage:repos:write",
+		]);
+		expect(REPOHOP_TOOL_SCOPES.manage_connections_list).toEqual([
+			"manage:connections:read",
+		]);
+		expect(REPOHOP_TOOL_SCOPES.manage_connections_revoke).toEqual([
+			"manage:connections:write",
+		]);
+		expect(REPOHOP_TOOL_SCOPES.manage_settings_read).toEqual([
+			"manage:settings:read",
+		]);
+		for (const name of [
+			"manage_devices_list",
+			"manage_repositories_list",
+			"manage_connections_list",
+			"manage_settings_read",
+		] as const) {
+			expect(REPOHOP_TOOL_RISK[name]).toBe("read");
+		}
+		for (const name of [
+			"manage_devices_remove",
+			"manage_repositories_request",
+			"manage_connections_revoke",
+		] as const) {
+			expect(REPOHOP_TOOL_RISK[name]).toBe("manage");
 		}
 	});
 	test("gateway body ceiling is the binding transport limit", () => {
@@ -131,6 +177,37 @@ describe("approval policy", () => {
 				tool: "project_exec",
 				args: {},
 				risk: riskOf("project_exec"),
+			}),
+		).toBe(false);
+	});
+	test("tiered approver escalates account-management mutations, not reads", async () => {
+		const policy = tieredApprover(async () => false);
+		expect(
+			await policy({
+				tool: "manage_devices_list",
+				args: {},
+				risk: riskOf("manage_devices_list"),
+			}),
+		).toBe(true);
+		for (const tool of [
+			"manage_devices_remove",
+			"manage_repositories_request",
+			"manage_connections_revoke",
+		] as const) {
+			expect(await policy({ tool, args: {}, risk: riskOf(tool) })).toBe(false);
+		}
+		expect(
+			await allowReadOnly({
+				tool: "manage_settings_read",
+				args: {},
+				risk: riskOf("manage_settings_read"),
+			}),
+		).toBe(true);
+		expect(
+			await allowReadOnly({
+				tool: "manage_devices_remove",
+				args: {},
+				risk: riskOf("manage_devices_remove"),
 			}),
 		).toBe(false);
 	});

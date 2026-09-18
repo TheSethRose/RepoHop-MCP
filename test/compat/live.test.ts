@@ -29,7 +29,7 @@ function bearerTransport(url: string, accessToken: string) {
 }
 
 describe("live conformance", () => {
-	live("initializes and advertises project_* tools only", async () => {
+	live("initializes and advertises known tools only", async () => {
 		const config = loadConfig({ REPOHOP_URL: baseUrl as string });
 		const transport = bearerTransport(mcpUrl(config), token as string);
 		const sdk = new Client(
@@ -41,8 +41,14 @@ describe("live conformance", () => {
 			const client = new RepoHopClient(sdk, config);
 			const tools = await client.tools();
 			expect(tools.length).toBeGreaterThan(0);
+			// Grants are scoped: a projects-only grant advertises project_*
+			// tools, while a grant with manage:* scopes additionally
+			// advertises the mirrored manage_* tools. Anything else is a
+			// server/client contract drift.
 			for (const tool of tools) {
-				expect(tool.name.startsWith("project_")).toBe(true);
+				expect(
+					tool.name.startsWith("project_") || tool.name.startsWith("manage_"),
+				).toBe(true);
 				expect(
 					(REPOHOP_TOOL_NAMES as readonly string[]).includes(tool.name),
 				).toBe(true);

@@ -14,6 +14,11 @@ import {
 	REPOHOP_TOOL_SCOPES,
 	type CatalogProject,
 	type CommitArgs,
+	type ManageConnectionsRevokeArgs,
+	type ManageDevicesRemoveArgs,
+	type ManageListArgs,
+	type ManageRepositoriesRequestArgs,
+	type ManageSettingsReadArgs,
 	type StatusArgs,
 	type SnapshotArgs,
 	type ListArgs,
@@ -354,6 +359,63 @@ export class RepoHopClient {
 		await this.resolveProject(args.project);
 		return this.call(
 			"project_push",
+			args as unknown as Record<string, unknown>,
+		);
+	}
+
+	// Account management: cloud-plane tools, no project routing. They are
+	// visible only on grants carrying the matching manage:* scopes.
+	// manage_devices_remove and manage_connections_revoke additionally
+	// require a server elicitation confirmation round — connect with an
+	// onElicit callback or those calls cannot complete.
+
+	async devices(args: ManageListArgs = {}): Promise<unknown> {
+		return this.callWithRetry(
+			"manage_devices_list",
+			args as unknown as Record<string, unknown>,
+		);
+	}
+
+	async removeDevice(args: ManageDevicesRemoveArgs): Promise<unknown> {
+		return this.call(
+			"manage_devices_remove",
+			args as unknown as Record<string, unknown>,
+		);
+	}
+
+	async repositories(args: ManageListArgs = {}): Promise<unknown> {
+		return this.callWithRetry(
+			"manage_repositories_list",
+			args as unknown as Record<string, unknown>,
+		);
+	}
+
+	async requestRepositoryChange(
+		args: ManageRepositoriesRequestArgs,
+	): Promise<unknown> {
+		return this.call(
+			"manage_repositories_request",
+			args as unknown as Record<string, unknown>,
+		);
+	}
+
+	async connections(args: ManageListArgs = {}): Promise<unknown> {
+		return this.callWithRetry(
+			"manage_connections_list",
+			args as unknown as Record<string, unknown>,
+		);
+	}
+
+	async revokeConnection(args: ManageConnectionsRevokeArgs): Promise<unknown> {
+		return this.call(
+			"manage_connections_revoke",
+			args as unknown as Record<string, unknown>,
+		);
+	}
+
+	async readSettings(args: ManageSettingsReadArgs): Promise<unknown> {
+		return this.callWithRetry(
+			"manage_settings_read",
 			args as unknown as Record<string, unknown>,
 		);
 	}

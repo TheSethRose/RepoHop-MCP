@@ -3,6 +3,8 @@ import {
 	StreamableHTTPClientTransport,
 	UnauthorizedError,
 	type CallToolResult,
+	type ElicitRequestParams,
+	type ElicitResult,
 } from "@modelcontextprotocol/client";
 import type { RepoHopConfig } from "../config.js";
 import { mcpUrl } from "../config.js";
@@ -14,6 +16,39 @@ export interface ConnectedClient {
 	transport: StreamableHTTPClientTransport;
 	serverInfo: { name: string; version: string };
 	close(): Promise<void>;
+}
+
+/**
+ * Server confirmation round for destructive account tools
+ * (`manage_devices_remove`, `manage_connections_revoke`). Return true to
+ * confirm. Decline (or throw) refuses. Without an `onElicit` callback the
+ * client declares no elicitation capability and those tools cannot complete
+ * their confirmation round — lists, settings reads, and change requests are
+ * unaffected.
+ */
+export type ElicitConfirmation = (
+	message: string,
+) => Promise<boolean> | boolean;
+
+export function createConfirmElicitationHandler(
+	onConfirm: ElicitConfirmation,
+): (request: { params: ElicitRequestParams }) => Promise<ElicitResult> {
+	return async (request) => {
+		const message =
+			typeof request.params?.message === "string" && request.params.message
+				? request.params.message
+				: "Confirm this RepoHop management action?";
+		let confirmed = false;
+		try {
+			confirmed = await onConfirm(message);
+		} catch {
+			confirmed = false;
+		}
+		if (confirmed) {
+			return { action: "accept", content: { confirm: true } };
+		}
+		return { action: "decline" };
+	};
 }
 
 /**
@@ -29,7 +64,10 @@ export interface ConnectedClient {
  */
 export async function connectRepoHop(
 	config: RepoHopConfig,
-	options: { provider?: RepoHopOAuthProvider } = {},
+	options: {
+		provider?: RepoHopOAuthProvider;
+		onElicit?: ElicitConfirmation;
+	} = {},
 ): Promise<ConnectedClient> {
 	const provider =
 		options.provider ??
@@ -52,6 +90,13 @@ export async function connectRepoHop(
 		{ name: "repohop-mcp-client", version: "0.1.0" },
 		{ capabilities: {} },
 	);
+	if (options.onElicit) {
+		client.registerCapabilities({ elicitation: {} });
+		client.setRequestHandler(
+			"elicitation/create",
+			createConfirmElicitationHandler(options.onElicit),
+		);
+	}
 	try {
 		await client.connect(transport);
 	} catch (error) {
