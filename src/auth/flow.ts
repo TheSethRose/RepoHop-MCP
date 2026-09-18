@@ -1,9 +1,11 @@
+import crypto from "node:crypto";
 import http from "node:http";
 import { auth } from "@modelcontextprotocol/client";
 import type { RepoHopConfig } from "../config.js";
 import { mcpUrl } from "../config.js";
 import { RepoHopError } from "../errors.js";
 import { RepoHopOAuthProvider } from "./provider.js";
+import { createRelaySession, pollForCode } from "./relay.js";
 
 export interface LoginResult {
 	authorizationUrl: string | null;
@@ -66,16 +68,21 @@ function listenForCode(
 /**
  * Interactive login. Phase 1 runs discovery + dynamic registration and
  * yields the authorize URL; after the operator approves in the browser, the
- * loopback listener captures the code and phase 2 exchanges it for tokens.
- * Tokens (with offline_access refresh) persist in the 0600 token file.
+ * callback (either loopback listener or relay-hosted) captures the code and
+ * phase 2 exchanges it for tokens. Tokens persist in the 0600 token file.
  */
 export async function login(
 	config: RepoHopConfig,
 	options: {
 		timeoutMs?: number;
 		onAuthorizationUrl?: (url: string) => void;
+		useRelay?: boolean;
 	} = {},
 ): Promise<LoginResult> {
+	if (options.useRelay) {
+		return loginViaRelay(config, options);
+	}
+
 	const provider = new RepoHopOAuthProvider({
 		tokenPath: config.tokenPath,
 		callbackPort: config.callbackPort,
@@ -108,6 +115,74 @@ export async function login(
 		authorizationCode: code,
 		...(iss === undefined ? {} : { iss }),
 	});
+	if (second !== "AUTHORIZED") {
+		throw new RepoHopError(
+			"AUTH_REJECTED",
+			"Code exchange did not authorize. Re-run login.",
+		);
+	}
+	return { authorizationUrl: authorizationUrl.toString(), authorized: true };
+}
+
+/**
+ * Login via the public RepoHop relay for remote/headless agents (e.g. Muse.ai, cloud VMs).
+ * The relay receives the browser callback and the agent polls for the code.
+ */
+export async function loginViaRelay(
+	config: RepoHopConfig,
+	options: {
+		timeoutMs?: number;
+		onAuthorizationUrl?: (url: string) => void;
+	} = {},
+): Promise<LoginResult> {
+	const state = crypto.randomBytes(32).toString("hex");
+	const session = await createRelaySession(config.relayUrl, state);
+
+	const provider = new RepoHopOAuthProvider({
+		tokenPath: config.tokenPath,
+		callbackPort: config.callbackPort,
+		scopes: config.scopes,
+		redirectUri: session.callbackUrl,
+	});
+
+	const serverUrl = mcpUrl(config);
+	const first = await auth(provider, {
+		serverUrl,
+		scope: config.scopes.join(" "),
+	});
+	if (first === "AUTHORIZED") {
+		return { authorizationUrl: null, authorized: true };
+	}
+
+	const authorizationUrl = provider.takeAuthorizationUrl();
+	if (!authorizationUrl) {
+		throw new RepoHopError(
+			"AUTH_REJECTED",
+			"Authorization redirect was not produced. Check server reachability and try again.",
+		);
+	}
+
+	// Bind state to authorize URL
+	authorizationUrl.searchParams.set("state", state);
+
+	options.onAuthorizationUrl?.(authorizationUrl.toString());
+
+	const { code, iss } = await pollForCode(
+		config.relayUrl,
+		session.sessionId,
+		session.secret,
+		{
+			timeoutMs: options.timeoutMs ?? 600_000,
+		},
+	);
+
+	const second = await auth(provider, {
+		serverUrl,
+		scope: config.scopes.join(" "),
+		authorizationCode: code,
+		...(iss === undefined ? {} : { iss }),
+	});
+
 	if (second !== "AUTHORIZED") {
 		throw new RepoHopError(
 			"AUTH_REJECTED",

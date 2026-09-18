@@ -7,7 +7,7 @@ Follow this file exactly. It is the contract; the README is the human version.
 
 1. `git clone https://github.com/TheSethRose/RepoHop-MCP.git && cd RepoHop-MCP`
 2. `bun install` (Bun 1.3.x; `bun --version` to confirm)
-3. `bun run cli login` — open the printed URL, approve with the requested scopes, return here. Tokens land in `~/.repohop-mcp/tokens.json` (0600). For local RepoHop dev, prefix every command with `REPOHOP_URL=http://localhost:3000`.
+3. For remote/headless agents (e.g. Muse.ai, cloud VMs): run `bun run cli login --relay` — open the printed URL on your phone or laptop, approve with requested scopes, and the relay completes the callback with zero copy-pasting. For local machine dev, run `bun run cli login` (loopback callback). Tokens land in `~/.repohop-mcp/tokens.json` (0600). For local RepoHop dev, prefix every command with `REPOHOP_URL=http://localhost:3000`.
 4. `bun run cli catalog` — must list at least one project with `ready: true`. If none is ready, STOP: the user must approve the repository in RepoHop Local / dashboard first. Do not proceed to reads or writes.
 5. `bun run verify` — must be green before you claim anything works.
 
@@ -25,7 +25,7 @@ Follow this file exactly. It is the contract; the README is the human version.
 ## 3. Changing this template
 
 - Tool contract lives in `src/tools/types.ts` (names, scopes, risk, budgets). It mirrors the server's canonical definitions. If the server adds/changes a tool, update the map AND the compat suite.
-- Auth flow lives in `src/auth/`. Do not weaken it: PKCE stays, loopback stays, token file stays 0600, DCR stays dynamic (no hardcoded client secrets, ever).
+- Auth flow lives in `src/auth/`. Do not weaken it: PKCE stays, loopback stays, relay-hosted callback stays ephemeral and burned on read, token file stays 0600, DCR stays dynamic (no hardcoded client secrets, ever).
 - Keep the SDK major pinned in lockstep with the server (`@modelcontextprotocol/*@2.0.0`, see `package.json#testedServers`). A major bump requires a full compat re-run.
 - Bot logic goes through `withBot()` in `src/bot/index.ts` so approval and lifecycle stay uniform. No second connection path.
 

@@ -21,6 +21,8 @@ export interface RepoHopConfig {
 	callbackPort: number;
 	/** Optional OAuth redirect URI override (defaults to loopback). */
 	redirectUri?: string | undefined;
+	/** Relay origin for remote callback sessions, e.g. https://relay.repohop.app */
+	relayUrl: string;
 }
 
 export const REPOHOP_SCOPES = [
@@ -43,6 +45,9 @@ export function loadConfig(
 		/\/+$/,
 		"",
 	);
+	const relayUrl = (
+		env.REPOHOP_RELAY_URL ?? "https://relay.repohop.app"
+	).replace(/\/+$/, "");
 	const scopes = (env.REPOHOP_SCOPES ?? [...REPOHOP_SCOPES].join(" "))
 		.split(/[\s,]+/)
 		.map((scope) => scope.trim())
@@ -55,6 +60,7 @@ export function loadConfig(
 		requestTimeoutMs: Number(env.REPOHOP_REQUEST_TIMEOUT_MS ?? 120_000),
 		callbackPort: Number(env.REPOHOP_CALLBACK_PORT ?? 12719),
 		redirectUri: env.REPOHOP_REDIRECT_URI,
+		relayUrl,
 	};
 }
 

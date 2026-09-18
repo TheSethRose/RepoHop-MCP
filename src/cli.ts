@@ -16,14 +16,14 @@ const config = loadConfig();
 function usage(): never {
 	console.log(`repohop-mcp — RepoHop MCP client
 
-  login                 OAuth login (browser approve, loopback callback)
+  login [--relay]       OAuth login (browser approve, loopback or relay callback)
   logout                Forget local tokens (revoke the grant in the dashboard)
   status                Show auth state + granted tools
   catalog               List granted projects (needs login)
   call <tool> <json>    Call one tool, e.g. call project_read '{"project":"x","path":"README.md"}'
 
-env: REPOHOP_URL (default https://repohop.app), REPOHOP_SCOPES,
-     REPOHOP_TOKEN_PATH, REPOHOP_REQUEST_TIMEOUT_MS, REPOHOP_CALLBACK_PORT`);
+env: REPOHOP_URL (default https://repohop.app), REPOHOP_RELAY_URL (default https://relay.repohop.app),
+     REPOHOP_SCOPES, REPOHOP_TOKEN_PATH, REPOHOP_REQUEST_TIMEOUT_MS, REPOHOP_CALLBACK_PORT`);
 	process.exit(2);
 }
 
@@ -35,11 +35,21 @@ async function main(): Promise<void> {
 	const [command, ...rest] = process.argv.slice(2);
 	if (!command) usage();
 	if (command === "login") {
+		const useRelay =
+			rest.includes("--relay") ||
+			Boolean(
+				process.env.REPOHOP_RELAY_URL && !process.env.REPOHOP_REDIRECT_URI,
+			);
 		const result = await login(config, {
+			useRelay,
 			onAuthorizationUrl: (url) => {
 				console.log("\nOpen this URL to approve the connection:\n");
 				console.log(url);
-				console.log("\nWaiting for the browser callback…");
+				if (useRelay) {
+					console.log("\nWaiting for approval on relay (zero-paste)…");
+				} else {
+					console.log("\nWaiting for the browser callback…");
+				}
 			},
 		});
 		console.log(result.authorized ? "Authorized." : "Not authorized.");
