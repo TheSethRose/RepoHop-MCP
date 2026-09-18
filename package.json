@@ -19,7 +19,8 @@
 		"format:check": "biome format .",
 		"test": "bun test test/unit",
 		"test:compat": "bun test test/compat",
-		"verify": "bun run lint && bun run type-check && bun run test"
+		"verify": "bun run lint && bun run type-check && bun run test",
+		"cli": "bun src/cli.ts"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/client": "2.0.0",
